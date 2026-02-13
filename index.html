@@ -2,33 +2,44 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>🧲 CERN AEgIS Mission: 2D Heatmap Edition</title>
+    <title>🧲 CERN AEgIS: Antimatter Crisis!</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         :root { --bg: #fdfdfd; --accent: #0074d9; --panel: #ffffff; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: #222; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* HUD - Top Bar */
         .hud { display: grid; grid-template-columns: 1fr 1.5fr 1fr; background: #eeeeee; padding: 15px 30px; border-bottom: 2px solid #cccccc; align-items: center; }
         #startBtn { padding: 12px 24px; font-size: 18px; font-weight: bold; background: #2ecc40; color: white; border: none; border-radius: 6px; cursor: pointer; }
         #startBtn:disabled { background: #aaaaaa; cursor: not-allowed; }
-        .score { font-size: 32px; font-weight: bold; text-align: center; color: #000; }
+        .score { font-size: 32px; font-weight: bold; text-align: center; }
         .timer { font-size: 32px; color: #ff4136; font-weight: bold; text-align: right; }
 
-        /* Main Workspace */
         .main-content { display: grid; grid-template-columns: 1fr 400px; flex: 1; overflow: hidden; gap: 10px; padding: 15px; background: #f4f4f4; }
         .plots { display: grid; grid-template-rows: 1.2fr 1fr; gap: 10px; overflow: hidden; }
-        .card { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .card { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 10px; }
         
-        /* Control Panel */
-        .controls { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
-        .controls h3 { margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 8px; font-size: 18px; }
+        .controls { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 20px; overflow-y: auto; }
         .coil-item { margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
-        .coil-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444; }
+        .coil-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 5px; }
         input[type=range] { width: 100%; cursor: pointer; }
+
+        #introModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-body { background: white; padding: 40px; border-radius: 15px; max-width: 600px; text-align: center; }
+        .ready-btn { margin-top: 20px; padding: 15px 40px; font-size: 20px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        select { padding: 5px; font-size: 16px; border-radius: 5px; margin-bottom: 10px; width: 100%; }
     </style>
 </head>
 <body>
+
+    <div id="introModal">
+        <div class="modal-body">
+            <h2>🚨 CERN EMERGENCY! 🚨</h2>
+            <p>Scientist! The Head Physicist spilled coffee on the Magnet Controller! The <strong>Antimatter Trap</strong> is collapsing!</p>
+            <p><strong>YOUR MISSION:</strong> Match the <strong>Thick Gray Goal</strong>. You need <strong>90% Stability</strong> to prevent a meltdown. You have 60 seconds!</p>
+            <button class="ready-btn" onclick="closeIntro()">SAVE THE LAB!</button>
+        </div>
+    </div>
 
     <div class="hud">
         <button onclick="beginMission()" id="startBtn">🚀 START MISSION</button>
@@ -42,7 +53,15 @@
             <div id="plot1D" class="card"></div>
         </div>
         <div class="controls card" id="coil-panel">
-            <h3>Magnet Power Supplies</h3>
+            <h3>Mission Parameters</h3>
+            <select id="missionSelect" onchange="toggleMission()">
+                <option value="aegis">AEgIS Mission (Fixed)</option>
+                <option value="random">Random Ghost Mission (Click Graph)</option>
+            </select>
+            <div id="clickInfo" style="font-size: 12px; color: #666; display:none; margin-bottom:10px;">
+                * Click on the bottom graph to generate a new ghost target!
+            </div>
+            <h3>Magnet Power Controls</h3>
             <div id="coil-list"></div>
         </div>
     </div>
@@ -52,16 +71,45 @@ let magnetData = null;
 let currents = {};
 let timeLeft = 0;
 let timerId = null;
+let currentTarget = [];
+let isRandom = false;
 
-// 1. Load Data
 fetch('magnet_data.json')
     .then(res => res.json())
     .then(data => {
         magnetData = data;
+        currentTarget = [...magnetData.target];
         initUI();
         update();
-    })
-    .catch(err => alert("Error: magnet_data.json not found. Run the MATLAB export script first!"));
+        setupClickListener();
+    });
+
+function closeIntro() { document.getElementById('introModal').style.display = 'none'; }
+
+function toggleMission() {
+    const mode = document.getElementById('missionSelect').value;
+    isRandom = (mode === 'random');
+    document.getElementById('clickInfo').style.display = isRandom ? 'block' : 'none';
+    currentTarget = isRandom ? new Array(magnetData.z_axial.length).fill(0) : [...magnetData.target];
+    update();
+}
+
+function setupClickListener() {
+    const plot = document.getElementById('plot1D');
+    plot.on('plotly_click', function() {
+        if (!isRandom) return;
+        // Generate a random ghost field by combining 3 random coils at random currents
+        const keys = Object.keys(magnetData.coils1D);
+        let ghost = new Array(magnetData.z_axial.length).fill(0);
+        for(let j=0; j<4; j++) {
+            let coil = keys[Math.floor(Math.random() * keys.length)];
+            let amp = Math.random() * 150;
+            magnetData.coils1D[coil].forEach((v, i) => ghost[i] += v * amp);
+        }
+        currentTarget = ghost;
+        update();
+    });
+}
 
 function initUI() {
     const list = document.getElementById('coil-list');
@@ -69,10 +117,8 @@ function initUI() {
         currents[name] = 0;
         let div = document.createElement('div');
         div.className = 'coil-item';
-        div.innerHTML = `
-            <div class="coil-info"><span>${name}</span><span id="label_${name}">0.0 A</span></div>
-            <input type="range" min="0" max="200" step="0.1" value="0" oninput="setPower('${name}', this.value)">
-        `;
+        div.innerHTML = `<div class="coil-info"><span>${name}</span><span id="label_${name}">0.0 A</span></div>
+                         <input type="range" min="0" max="200" step="0.1" value="0" oninput="setPower('${name}', this.value)">`;
         list.appendChild(div);
     });
 }
@@ -88,48 +134,39 @@ function update() {
     if (!magnetData) return;
     const zAxial = magnetData.z_axial;
     let bz1D = new Array(zAxial.length).fill(0);
-    let bmag2D = Array.from({length: magnetData.y_grid.length}, () => 
-                 new Array(magnetData.z_grid.length).fill(0));
+    let bmag2D = Array.from({length: magnetData.y_grid.length}, () => new Array(magnetData.z_grid.length).fill(0));
 
-    // Physics Engine: Superposition of vectors
     for (let name in currents) {
         let I = currents[name];
         if (I > 0) {
             magnetData.coils1D[name].forEach((v, i) => bz1D[i] += v * I);
-            magnetData.coils2D[name].forEach((row, r) => {
-                row.forEach((v, c) => bmag2D[r][c] += v * I);
-            });
+            magnetData.coils2D[name].forEach((row, r) => { row.forEach((v, c) => bmag2D[r][c] += v * I); });
         }
     }
 
-    // Scoring with 3.3x Difficulty
     let errorSum = 0;
-    const peak = Math.max(...magnetData.target.map(Math.abs));
-    zAxial.forEach((_, i) => errorSum += Math.abs(magnetData.target[i] - bz1D[i]));
+    const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
+    zAxial.forEach((_, i) => errorSum += Math.abs(currentTarget[i] - bz1D[i]));
     let match = Math.max(0, 100 * (1 - ((errorSum / zAxial.length) / peak * 3.3)));
     
     const scoreElem = document.getElementById('scoreLabel');
     scoreElem.innerText = `MATCH: ${match.toFixed(1)}%`;
     scoreElem.style.color = match >= 90 ? "#2ecc40" : "#000";
 
-    // Update 1D Plot
     Plotly.react('plot1D', [
-        { x: zAxial, y: magnetData.target, name: 'Goal', line: {color:'#888', width:6} },
-        { x: zAxial, y: bz1D, name: 'Live', line: {color:'#0074d9', width:2} }
+        { x: zAxial, y: currentTarget, name: 'Goal', line: {color:'#888', width: 6} },
+        { x: zAxial, y: bz1D, name: 'Live', line: {color:'#0074d9', width: 2.5} }
     ], { title: 'Axial Profile (Bz)', margin: {t:40, b:40, l:50, r:20} });
 
-    // Update 2D Heatmap
+    
     Plotly.react('plot2D', [{
-        z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, 
-        type: 'heatmap', colorscale: 'Turbo', zsmooth: 'best'
-    }], { title: '2D Magnetic Map (Magnitude)', margin: {t:40, b:40, l:50, r:20} });
+        z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, type: 'heatmap', colorscale: 'Turbo', zsmooth: 'best'
+    }], { title: '2D Field Intensity', margin: {t:40, b:40, l:50, r:20} });
 }
 
 function beginMission() {
     timeLeft = 60;
     document.getElementById('startBtn').disabled = true;
-    
-    // Reset currents to 0 for a clean start
     for (let n in currents) currents[n] = 0;
     document.querySelectorAll('input[type=range]').forEach(i => i.value = 0);
     document.querySelectorAll('[id^="label_"]').forEach(s => s.innerText = "0.0 A");
@@ -138,24 +175,14 @@ function beginMission() {
     timerId = setInterval(() => {
         timeLeft--;
         document.getElementById('timerLabel').innerText = timeLeft + "s";
-        
         if (timeLeft <= 0) {
             clearInterval(timerId);
             timerId = null;
-
             let finalMatch = parseFloat(document.getElementById('scoreLabel').innerText.replace('MATCH: ', ''));
-
-            if (finalMatch >= 90) {
-                alert(`🏆 MISSION SUCCESS!\nMatch: ${finalMatch.toFixed(1)}%\nAntimatter is stable and contained!`);
-            } else {
-                alert(`⚠️ MISSION FAILED!\nMatch: ${finalMatch.toFixed(1)}%\nContainment failed. You need at least 90% stability.`);
-            }
-
-            if (confirm("Would you like to restart the mission?")) {
-                beginMission();
-            } else {
-                document.getElementById('startBtn').disabled = false;
-            }
+            if (finalMatch >= 90) alert("🎊 SUCCESS! Antimatter Stable.");
+            else alert("💥 BOOM! Better luck next time.");
+            if (confirm("Restart Mission?")) beginMission();
+            else document.getElementById('startBtn').disabled = false;
         }
     }, 1000);
 }
