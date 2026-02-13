@@ -36,7 +36,7 @@
         #introModal, #reportModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 1000; }
         .modal-body { background: #000; border: 2px solid var(--accent); padding: 40px; text-align: center; max-width: 650px; width: 90%; box-shadow: 0 0 20px var(--accent); }
         .ready-btn { margin-top: 20px; padding: 15px 40px; background: var(--accent); color: #000; border: none; cursor: pointer; font-weight: bold; }
-        .funny-msg { color: #888; font-style: italic; font-size: 14px; margin-bottom: 20px; }
+        .funny-msg { color: #888; font-style: italic; font-size: 14px; margin-bottom: 20px; min-height: 40px; }
     </style>
 </head>
 <body>
@@ -44,19 +44,19 @@
     <div id="introModal">
         <div class="modal-body">
             <h2>&gt; SYSTEM_BOOT_SEQUENCE</h2>
-            <p class="funny-msg">"Loading budget-grade magnets... Calibrating coffee levels... Warning: Antihydrogen doesn't like your face."</p>
+            <p id="bootQuip" class="funny-msg"></p>
             <p>1D Axial Confinement Protocol Enabled.</p>
-            <p><strong>GOAL:</strong> Keep stability above <strong>90%</strong> or you'll be demoted to 'Safety Cones Manager'.</p>
-            <button class="ready-btn" onclick="initAudio(); document.getElementById('introModal').style.display='none'">I PROMISE NOT TO BLOW IT UP</button>
+            <p><strong>GOAL:</strong> Maintain stability at <strong>90%+</strong>. Failure results in a very polite but firm letter from CERN HR.</p>
+            <button class="ready-btn" onclick="initAudio(); document.getElementById('introModal').style.display='none'">ENGAGE MAGNETS (CAREFULLY)</button>
         </div>
     </div>
 
     <div id="reportModal" style="display:none;">
         <div class="modal-body">
             <h2>&gt; MISSION_DEBRIEF</h2>
-            <p id="reportMsg" style="font-size: 20px; font-weight: bold; margin: 20px 0;"></p>
+            <p id="reportMsg" style="font-size: 18px; line-height: 1.5; margin: 20px 0;"></p>
             <div id="reportGraph" style="height:250px;"></div>
-            <button class="ready-btn" onclick="location.reload()">TRY AGAIN, SHIELD YOUR EYES</button>
+            <button class="ready-btn" onclick="location.reload()">RE-INITIALIZE HARDWARE</button>
         </div>
     </div>
 
@@ -93,9 +93,27 @@ let magnetData = null; let currents = {}; let timeLeft = 0; let timerId = null;
 let currentTarget = []; let isRandom = false; let curMatch = 0; let stabilityHistory = [];
 let zk = 'z'; let ck = 'coils';
 
+// --- AUDIO SYSTEM ---
 let audioCtx = null;
 let bgHum = null; 
 let alarmOsc = null;
+
+const quips = [
+    "Loading budget-grade magnets... Calibrating coffee levels... Warning: Antihydrogen doesn't like your face.",
+    "Simulating 'Scientific Breakthrough'... Error: Result is just another PhD thesis. Deleting files to save space.",
+    "Cryogenic cooling initiated. Please remove your fingers from the liquid nitrogen—unless you were planning on being a statue today.",
+    "Scanning for competent operator... Searching... Searching... Warning: Results inconclusive. Proceeding with low expectations.",
+    "Antimatter annihilation imminent. If you see a bright light, please refrain from screaming; it’s bad for the data sensors.",
+    "Adjusting magnetic field to 'Maximum Overdrive.' If the building starts vibrating, that’s just the laws of physics asking for a raise.",
+    "Vacuum seal integrity at 99%. The remaining 1% is just hope and duct tape. Good luck.",
+    "Bypassing safety protocols... Why? Because clicking 'Yes' to all those warnings was taking too long.",
+    "Recalibrating particle sensors. Currently detecting 40% positrons and 60% sheer panic.",
+    "Quantum tunnel initialized. Please don't think about cats. Especially dead/alive ones. It makes the math messy."
+];
+
+function setRandomQuip() {
+    document.getElementById('bootQuip').innerText = `"${quips[Math.floor(Math.random() * quips.length)]}"`;
+}
 
 function initAudio() {
     if (!audioCtx) {
@@ -155,6 +173,7 @@ function stopSounds() {
     if (alarmOsc) { try { alarmOsc.stop(); } catch(e) {} alarmOsc = null; }
 }
 
+// --- PARTICLE PHYSICS ENGINE ---
 const canvas = document.getElementById('particleCanvas');
 const ctx = canvas.getContext('2d');
 let particles = [];
@@ -199,12 +218,35 @@ function animateParticles() {
     requestAnimationFrame(animateParticles);
 }
 
+// --- INITIALIZATION ---
+setRandomQuip();
+
 fetch('magnet_data.json').then(res => res.json()).then(data => {
     magnetData = data;
     zk = data.z_axial ? 'z_axial' : 'z';
     ck = data.coils1D ? 'coils1D' : 'coils';
     currentTarget = [...data.target];
-    initUI(); update(); initParticles(); animateParticles(); displayLeaderboard();
+    initUI(); 
+    update(); 
+    initParticles(); 
+    animateParticles(); 
+    displayLeaderboard();
+
+    // GHOST MODE CLICK LISTENER
+    const plot1D = document.getElementById('plot1D');
+    plot1D.on('plotly_click', function() {
+        if (!isRandom) return;
+        playSound('click');
+        let ghost = new Array(magnetData[zk].length).fill(0);
+        const keys = Object.keys(magnetData[ck]);
+        for(let j=0; j<4; j++) {
+            let k = keys[Math.floor(Math.random() * keys.length)];
+            let amp = Math.random() * 150;
+            magnetData[ck][k].forEach((v, i) => ghost[i] += v * amp);
+        }
+        currentTarget = ghost; 
+        update();
+    });
 });
 
 function initUI() {
@@ -238,15 +280,24 @@ function update() {
     const z = magnetData[zk]; 
     let bz1D = new Array(z.length).fill(0);
     let bmag2D = magnetData.y_grid ? Array.from({length: magnetData.y_grid.length}, () => new Array(magnetData.z_grid.length).fill(0)) : null;
-
+    
+    let totalCurrent = 0;
     for (let name in currents) {
-        let I = currents[name]; if (I <= 0) continue;
+        let I = currents[name]; 
+        totalCurrent += I;
+        if (I <= 0) continue;
         magnetData[ck][name].forEach((v, i) => bz1D[i] += v * I);
         if (bmag2D) magnetData.coils2D[name].forEach((row, r) => row.forEach((v, c) => bmag2D[r][c] += v * I));
     }
-    let err = 0; const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
-    z.forEach((_, i) => err += Math.abs(currentTarget[i] - bz1D[i]));
-    curMatch = Math.max(0, 100 * (1 - ((err / z.length) / peak * 3.3)));
+
+    if (totalCurrent < 0.1) {
+        curMatch = 0; // Harsher Logic: No power, no stability.
+    } else {
+        let err = 0; 
+        const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
+        z.forEach((_, i) => err += Math.abs(currentTarget[i] - bz1D[i]));
+        curMatch = Math.max(0, 100 * (1 - ((err / z.length) / peak * 3.3)));
+    }
     
     document.getElementById('scoreLabel').innerText = `STABILITY: ${curMatch.toFixed(1)}%`;
     Plotly.react('plot1D', [{ x: z, y: currentTarget, name: 'Goal', line: {color:'#444', width:6} }, { x: z, y: bz1D, name: 'Live', line: {color:'#00ff41', width:2} }], { paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#00ff41'}, margin:{t:30,b:30,l:40,r:10} });
@@ -291,7 +342,7 @@ function showReport() {
     if (curMatch < 30) {
         result = "FAILURE: You are a useless scientist. Please return your lab coat and exit via the gift shop.";
     } else if (curMatch < 70) {
-        result = "MEDIOCRE: Not a total disaster, but the pbars are bored. Try harder.";
+        result = "MEDIOCRE: Not a total disaster, but the positrons are bored. Try harder.";
     } else if (curMatch < 90) {
         result = "STABLE-ISH: You're getting there. Still wouldn't trust you with the Large Hadron Collider though.";
     } else {
