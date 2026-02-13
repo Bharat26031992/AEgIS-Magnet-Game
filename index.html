@@ -1,32 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>AEgIS Mission: 2D Heatmap Edition</title>
+    <meta charset="UTF-8">
+    <title>🧲 CERN AEgIS Mission: 2D Heatmap Edition</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #fdfdfd; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .hud { display: grid; grid-template-columns: 1fr 1fr 1fr; background: #eee; padding: 15px; border-bottom: 2px solid #ccc; align-items: center; }
-        .main { display: grid; grid-template-columns: 1fr 380px; flex: 1; overflow: hidden; gap: 10px; padding: 10px; }
-        .plots { display: grid; grid-template-rows: 1.2fr 1fr; gap: 10px; }
-        #plot2D, #plot1D { background: white; border: 1px solid #ddd; border-radius: 8px; height: 100%; }
-        .controls { background: white; border: 1px solid #ddd; padding: 20px; overflow-y: auto; }
+        :root { --bg: #fdfdfd; --accent: #0074d9; --panel: #ffffff; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: #222; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* HUD - Top Bar */
+        .hud { display: grid; grid-template-columns: 1fr 1.5fr 1fr; background: #eeeeee; padding: 15px 30px; border-bottom: 2px solid #cccccc; align-items: center; }
+        #startBtn { padding: 12px 24px; font-size: 18px; font-weight: bold; background: #2ecc40; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        #startBtn:disabled { background: #aaaaaa; cursor: not-allowed; }
+        .score { font-size: 32px; font-weight: bold; text-align: center; color: #000; }
+        .timer { font-size: 32px; color: #ff4136; font-weight: bold; text-align: right; }
+
+        /* Main Workspace */
+        .main-content { display: grid; grid-template-columns: 1fr 400px; flex: 1; overflow: hidden; gap: 10px; padding: 15px; background: #f4f4f4; }
+        .plots { display: grid; grid-template-rows: 1.2fr 1fr; gap: 10px; overflow: hidden; }
+        .card { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        /* Control Panel */
+        .controls { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        .controls h3 { margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 8px; font-size: 18px; }
+        .coil-item { margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+        .coil-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444; }
         input[type=range] { width: 100%; cursor: pointer; }
     </style>
 </head>
 <body>
+
     <div class="hud">
-        <button onclick="startMission()" id="startBtn" style="padding:10px; background:#2ecc40; color:white; border:none; border-radius:5px; cursor:pointer;">🚀 START MISSION</button>
-        <div id="scoreLabel" style="font-size:24px; font-weight:bold; text-align:center;">MATCH: 0.0%</div>
-        <div id="timerLabel" style="font-size:24px; font-weight:bold; text-align:right; color:red;">60s</div>
+        <button onclick="beginMission()" id="startBtn">🚀 START MISSION</button>
+        <div class="score" id="scoreLabel">MATCH: 0.0%</div>
+        <div class="timer" id="timerLabel">60s</div>
     </div>
 
-    <div class="main">
+    <div class="main-content">
         <div class="plots">
-            <div id="plot2D"></div>
-            <div id="plot1D"></div>
+            <div id="plot2D" class="card"></div>
+            <div id="plot1D" class="card"></div>
         </div>
-        <div class="controls" id="coil-panel">
-            <h3 style="margin-top:0">Magnet Supplies</h3>
+        <div class="controls card" id="coil-panel">
+            <h3>Magnet Power Supplies</h3>
+            <div id="coil-list"></div>
         </div>
     </div>
 
@@ -34,7 +51,9 @@
 let magnetData = null;
 let currents = {};
 let timeLeft = 0;
+let timerId = null;
 
+// 1. Load Data
 fetch('magnet_data.json')
     .then(res => res.json())
     .then(data => {
@@ -42,22 +61,26 @@ fetch('magnet_data.json')
         initUI();
         update();
     })
-    .catch(err => alert("Error: magnet_data.json is missing 2D data keys!"));
+    .catch(err => alert("Error: magnet_data.json not found. Run the MATLAB export script first!"));
 
 function initUI() {
-    const panel = document.getElementById('coil-panel');
+    const list = document.getElementById('coil-list');
     Object.keys(magnetData.coils1D).sort().forEach(name => {
         currents[name] = 0;
         let div = document.createElement('div');
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; font-size:12px; margin-top:10px"><b>${name}</b><span id="amp_${name}">0 A</span></div>
-                         <input type="range" min="0" max="200" value="0" oninput="setI('${name}', this.value)">`;
-        panel.appendChild(div);
+        div.className = 'coil-item';
+        div.innerHTML = `
+            <div class="coil-info"><span>${name}</span><span id="label_${name}">0.0 A</span></div>
+            <input type="range" min="0" max="200" step="0.1" value="0" oninput="setPower('${name}', this.value)">
+        `;
+        list.appendChild(div);
     });
 }
 
-function setI(name, val) {
+function setPower(name, val) {
+    if (timeLeft <= 0 && timerId !== null) return; 
     currents[name] = parseFloat(val);
-    document.getElementById(`amp_${name}`).innerText = val + " A";
+    document.getElementById(`label_${name}`).innerText = val + " A";
     update();
 }
 
@@ -65,60 +88,75 @@ function update() {
     if (!magnetData) return;
     const zAxial = magnetData.z_axial;
     let bz1D = new Array(zAxial.length).fill(0);
-    
-    // Initialize empty 2D matrix
     let bmag2D = Array.from({length: magnetData.y_grid.length}, () => 
                  new Array(magnetData.z_grid.length).fill(0));
 
-    // Calculate superposition for both 1D and 2D
+    // Physics Engine: Superposition of vectors
     for (let name in currents) {
         let I = currents[name];
         if (I > 0) {
-            // Update 1D Axial
             magnetData.coils1D[name].forEach((v, i) => bz1D[i] += v * I);
-            // Update 2D Heatmap
             magnetData.coils2D[name].forEach((row, r) => {
                 row.forEach((v, c) => bmag2D[r][c] += v * I);
             });
         }
     }
 
-    // Scoring logic
-    let err = 0;
+    // Scoring with 3.3x Difficulty
+    let errorSum = 0;
     const peak = Math.max(...magnetData.target.map(Math.abs));
-    zAxial.forEach((_, i) => err += Math.abs(magnetData.target[i] - bz1D[i]));
-    let match = Math.max(0, 100 * (1 - ((err / zAxial.length) / peak * 3.3)));
-    document.getElementById('scoreLabel').innerText = `MATCH: ${match.toFixed(1)}%`;
+    zAxial.forEach((_, i) => errorSum += Math.abs(magnetData.target[i] - bz1D[i]));
+    let match = Math.max(0, 100 * (1 - ((errorSum / zAxial.length) / peak * 3.3)));
+    
+    const scoreElem = document.getElementById('scoreLabel');
+    scoreElem.innerText = `MATCH: ${match.toFixed(1)}%`;
+    scoreElem.style.color = match >= 90 ? "#2ecc40" : "#000";
 
-    // Render 1D Plot
+    // Update 1D Plot
     Plotly.react('plot1D', [
         { x: zAxial, y: magnetData.target, name: 'Goal', line: {color:'#888', width:6} },
         { x: zAxial, y: bz1D, name: 'Live', line: {color:'#0074d9', width:2} }
     ], { title: 'Axial Profile (Bz)', margin: {t:40, b:40, l:50, r:20} });
 
-    // Render 2D Heatmap
+    // Update 2D Heatmap
     Plotly.react('plot2D', [{
-        z: bmag2D, 
-        x: magnetData.z_grid, 
-        y: magnetData.y_grid, 
-        type: 'heatmap', 
-        colorscale: 'Turbo',
-        zsmooth: 'best'
-    }], { 
-        title: '2D Magnetic Map (Magnitude)', 
-        margin: {t:40, b:40, l:50, r:20},
-        xaxis: {title: 'Z [mm]'},
-        yaxis: {title: 'Y [mm]'}
-    });
+        z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, 
+        type: 'heatmap', colorscale: 'Turbo', zsmooth: 'best'
+    }], { title: '2D Magnetic Map (Magnitude)', margin: {t:40, b:40, l:50, r:20} });
 }
 
-function startMission() {
+function beginMission() {
     timeLeft = 60;
     document.getElementById('startBtn').disabled = true;
-    let clock = setInterval(() => {
+    
+    // Reset currents to 0 for a clean start
+    for (let n in currents) currents[n] = 0;
+    document.querySelectorAll('input[type=range]').forEach(i => i.value = 0);
+    document.querySelectorAll('[id^="label_"]').forEach(s => s.innerText = "0.0 A");
+    update();
+
+    timerId = setInterval(() => {
         timeLeft--;
         document.getElementById('timerLabel').innerText = timeLeft + "s";
-        if (timeLeft <= 0) { clearInterval(clock); document.getElementById('startBtn').disabled = false; }
+        
+        if (timeLeft <= 0) {
+            clearInterval(timerId);
+            timerId = null;
+
+            let finalMatch = parseFloat(document.getElementById('scoreLabel').innerText.replace('MATCH: ', ''));
+
+            if (finalMatch >= 90) {
+                alert(`🏆 MISSION SUCCESS!\nMatch: ${finalMatch.toFixed(1)}%\nAntimatter is stable and contained!`);
+            } else {
+                alert(`⚠️ MISSION FAILED!\nMatch: ${finalMatch.toFixed(1)}%\nContainment failed. You need at least 90% stability.`);
+            }
+
+            if (confirm("Would you like to restart the mission?")) {
+                beginMission();
+            } else {
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
     }, 1000);
 }
 </script>
