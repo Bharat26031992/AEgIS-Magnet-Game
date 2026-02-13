@@ -2,48 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>🧲 CERN AEgIS: Antimatter Crisis!</title>
+    <title>🧲 CERN AEgIS: OVERLOAD_SEQUENCE</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        :root { --bg: #fdfdfd; --accent: #0074d9; --panel: #ffffff; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: #222; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        :root { --bg: #0b0e14; --accent: #00ff41; --panel: #161b22; --text: #00ff41; }
+        body { font-family: 'Courier New', Courier, monospace; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        .hud { display: grid; grid-template-columns: 1fr 1.5fr 1fr; background: #eeeeee; padding: 15px 30px; border-bottom: 2px solid #cccccc; align-items: center; }
-        #startBtn { padding: 12px 24px; font-size: 18px; font-weight: bold; background: #2ecc40; color: white; border: none; border-radius: 6px; cursor: pointer; }
-        #startBtn:disabled { background: #aaaaaa; cursor: not-allowed; }
-        .score { font-size: 32px; font-weight: bold; text-align: center; }
-        .timer { font-size: 32px; color: #ff4136; font-weight: bold; text-align: right; }
+        /* Glitch Animation */
+        @keyframes glitch-shake {
+            0% { transform: translate(0); }
+            25% { transform: translate(-3px, 3px); }
+            50% { transform: translate(3px, -3px); }
+            75% { transform: translate(-3px, -3px); }
+            100% { transform: translate(0); }
+        }
+        .glitch-active { animation: glitch-shake 0.15s infinite; border: 2px solid #ff3131 !important; }
 
-        .main-content { display: grid; grid-template-columns: 1fr 400px; flex: 1; overflow: hidden; gap: 10px; padding: 15px; background: #f4f4f4; }
-        .plots { display: grid; grid-template-rows: 1.2fr 1fr; gap: 10px; overflow: hidden; }
-        .card { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 10px; }
-        
-        .controls { background: var(--panel); border: 1px solid #ddd; border-radius: 10px; padding: 20px; overflow-y: auto; }
-        .coil-item { margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
-        .coil-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 5px; }
-        input[type=range] { width: 100%; cursor: pointer; }
+        .hud { display: grid; grid-template-columns: 1fr 1.5fr 1fr; background: #000; padding: 15px 30px; border-bottom: 2px solid var(--accent); align-items: center; z-index: 10; }
+        #startBtn { padding: 12px 24px; font-size: 18px; font-weight: bold; background: var(--accent); color: #000; border: none; cursor: pointer; text-transform: uppercase; }
+        #startBtn:disabled { background: #333; color: #666; }
+        .score { font-size: 32px; font-weight: bold; text-align: center; text-shadow: 0 0 10px var(--accent); }
+        .timer { font-size: 32px; color: #ff3131; font-weight: bold; text-align: right; transition: all 0.2s; }
 
-        #introModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-body { background: white; padding: 40px; border-radius: 15px; max-width: 600px; text-align: center; }
-        .ready-btn { margin-top: 20px; padding: 15px 40px; font-size: 20px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .main-content { display: grid; grid-template-columns: 1fr 350px 300px; flex: 1; overflow: hidden; gap: 10px; padding: 10px; background: #000; }
+        .plots { display: grid; grid-template-rows: 1.2fr 1fr; gap: 10px; }
+        .card { background: var(--panel); border: 1px solid var(--accent); border-radius: 4px; padding: 15px; overflow-y: auto; }
         
-        select { padding: 5px; font-size: 16px; border-radius: 5px; margin-bottom: 10px; width: 100%; }
+        .controls h3, .leaderboard h3 { margin: 0 0 10px 0; border-bottom: 1px solid var(--accent); padding-bottom: 8px; font-size: 16px; text-transform: uppercase; }
+        .coil-item { margin-bottom: 12px; border-bottom: 1px solid #333; }
+        .coil-info { display: flex; justify-content: space-between; font-size: 12px; }
+        input[type=range] { width: 100%; cursor: pointer; filter: hue-rotate(90deg); }
+
+        #leaderboard-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        #leaderboard-table td { padding: 8px 5px; border-bottom: 1px solid #333; }
+
+        #introModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-body { background: #000; border: 2px solid var(--accent); padding: 40px; text-align: center; max-width: 600px; }
+        .ready-btn { margin-top: 20px; padding: 15px 40px; background: var(--accent); color: #000; border: none; cursor: pointer; font-weight: bold; }
+        select { background: #000; color: var(--accent); border: 1px solid var(--accent); width: 100%; margin-bottom: 10px; padding: 5px; }
     </style>
 </head>
-<body>
+<body id="game-body">
 
     <div id="introModal">
         <div class="modal-body">
-            <h2>🚨 CERN EMERGENCY! 🚨</h2>
-            <p>Scientist! The Head Physicist spilled coffee on the Magnet Controller! The <strong>Antimatter Trap</strong> is collapsing!</p>
-            <p><strong>YOUR MISSION:</strong> Match the <strong>Thick Gray Goal</strong>. You need <strong>90% Stability</strong> to prevent a meltdown. You have 60 seconds!</p>
-            <button class="ready-btn" onclick="closeIntro()">SAVE THE LAB!</button>
+            <h2>&gt; AEGIS_STABILITY_CRITICAL</h2>
+            <p>[SYSTEM] Coffee-Spill in Reactor Room. Magnetic trap failing.</p>
+            <p><strong>GOAL:</strong> Restore stability to <strong>90%</strong> or evacuate the sector.</p>
+            <button class="ready-btn" onclick="closeIntro()">ENGAGE STABILIZERS</button>
         </div>
     </div>
 
     <div class="hud">
-        <button onclick="beginMission()" id="startBtn">🚀 START MISSION</button>
-        <div class="score" id="scoreLabel">MATCH: 0.0%</div>
+        <button onclick="beginMission()" id="startBtn">INIT_SEQUENCE</button>
+        <div class="score" id="scoreLabel">STABILITY: 0.0%</div>
         <div class="timer" id="timerLabel">60s</div>
     </div>
 
@@ -52,17 +64,18 @@
             <div id="plot2D" class="card"></div>
             <div id="plot1D" class="card"></div>
         </div>
-        <div class="controls card" id="coil-panel">
-            <h3>Mission Parameters</h3>
+        <div class="card controls">
+            <h3>&gt; MISSION_MODE</h3>
             <select id="missionSelect" onchange="toggleMission()">
-                <option value="aegis">AEgIS Mission (Fixed)</option>
-                <option value="random">Random Ghost Mission (Click Graph)</option>
+                <option value="aegis">AEgIS_MAIN</option>
+                <option value="random">RANDOM_GHOST</option>
             </select>
-            <div id="clickInfo" style="font-size: 12px; color: #666; display:none; margin-bottom:10px;">
-                * Click on the bottom graph to generate a new ghost target!
-            </div>
-            <h3>Magnet Power Controls</h3>
+            <h3>&gt; COIL_DRIVE</h3>
             <div id="coil-list"></div>
+        </div>
+        <div class="card leaderboard">
+            <h3>&gt; HALL_OF_FAME</h3>
+            <table id="leaderboard-table"><tbody id="leaderboard-body"></tbody></table>
         </div>
     </div>
 
@@ -74,42 +87,54 @@ let timerId = null;
 let currentTarget = [];
 let isRandom = false;
 
-fetch('magnet_data.json')
-    .then(res => res.json())
-    .then(data => {
-        magnetData = data;
-        currentTarget = [...magnetData.target];
-        initUI();
-        update();
-        setupClickListener();
-    });
+// --- DIGITAL AUDIO ENGINE ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let bgHum = null;
+let dataPulse = null;
+
+function playDigitalSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (type === 'hum') {
+        bgHum = audioCtx.createOscillator();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+        bgHum.type = 'square';
+        bgHum.frequency.setValueAtTime(50, audioCtx.currentTime);
+        filter.type = 'lowpass'; filter.frequency.setValueAtTime(200, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        bgHum.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+        bgHum.start();
+        dataPulse = setInterval(() => {
+            if (timeLeft > 10) {
+                let o = audioCtx.createOscillator(); let g = audioCtx.createGain();
+                o.frequency.setValueAtTime(Math.random()*2000+1000, audioCtx.currentTime);
+                g.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.05);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(); o.stop(audioCtx.currentTime+0.1);
+            }
+        }, 800);
+    } else if (type === 'alarm') {
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'square'; osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start();
+        let toggle = true;
+        let alarmInt = setInterval(() => {
+            if (timeLeft <= 0) { osc.stop(); clearInterval(alarmInt); return; }
+            osc.frequency.setValueAtTime(toggle ? 1000 : 600, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            toggle = !toggle;
+        }, 150);
+    }
+}
+
+// --- GAME LOGIC ---
+fetch('magnet_data.json').then(res => res.json()).then(data => {
+    magnetData = data; currentTarget = [...data.target];
+    initUI(); update(); displayLeaderboard(); setupPlotClick();
+});
 
 function closeIntro() { document.getElementById('introModal').style.display = 'none'; }
-
-function toggleMission() {
-    const mode = document.getElementById('missionSelect').value;
-    isRandom = (mode === 'random');
-    document.getElementById('clickInfo').style.display = isRandom ? 'block' : 'none';
-    currentTarget = isRandom ? new Array(magnetData.z_axial.length).fill(0) : [...magnetData.target];
-    update();
-}
-
-function setupClickListener() {
-    const plot = document.getElementById('plot1D');
-    plot.on('plotly_click', function() {
-        if (!isRandom) return;
-        // Generate a random ghost field by combining 3 random coils at random currents
-        const keys = Object.keys(magnetData.coils1D);
-        let ghost = new Array(magnetData.z_axial.length).fill(0);
-        for(let j=0; j<4; j++) {
-            let coil = keys[Math.floor(Math.random() * keys.length)];
-            let amp = Math.random() * 150;
-            magnetData.coils1D[coil].forEach((v, i) => ghost[i] += v * amp);
-        }
-        currentTarget = ghost;
-        update();
-    });
-}
 
 function initUI() {
     const list = document.getElementById('coil-list');
@@ -117,14 +142,34 @@ function initUI() {
         currents[name] = 0;
         let div = document.createElement('div');
         div.className = 'coil-item';
-        div.innerHTML = `<div class="coil-info"><span>${name}</span><span id="label_${name}">0.0 A</span></div>
+        div.innerHTML = `<div class="coil-info"><span>${name}</span><span id="label_${name}">0 A</span></div>
                          <input type="range" min="0" max="200" step="0.1" value="0" oninput="setPower('${name}', this.value)">`;
         list.appendChild(div);
     });
 }
 
+function toggleMission() {
+    isRandom = (document.getElementById('missionSelect').value === 'random');
+    currentTarget = isRandom ? new Array(magnetData.z_axial.length).fill(0) : [...magnetData.target];
+    update();
+}
+
+function setupPlotClick() {
+    document.getElementById('plot1D').on('plotly_click', () => {
+        if (!isRandom) return;
+        let ghost = new Array(magnetData.z_axial.length).fill(0);
+        const keys = Object.keys(magnetData.coils1D);
+        for(let j=0; j<4; j++) {
+            let k = keys[Math.floor(Math.random() * keys.length)];
+            let amp = Math.random() * 120;
+            magnetData.coils1D[k].forEach((v, i) => ghost[i] += v * amp);
+        }
+        currentTarget = ghost; update();
+    });
+}
+
 function setPower(name, val) {
-    if (timeLeft <= 0 && timerId !== null) return; 
+    if (timeLeft <= 0 && timerId !== null) return;
     currents[name] = parseFloat(val);
     document.getElementById(`label_${name}`).innerText = val + " A";
     update();
@@ -132,57 +177,67 @@ function setPower(name, val) {
 
 function update() {
     if (!magnetData) return;
-    const zAxial = magnetData.z_axial;
-    let bz1D = new Array(zAxial.length).fill(0);
+    const z = magnetData.z_axial; let bz1D = new Array(z.length).fill(0);
     let bmag2D = Array.from({length: magnetData.y_grid.length}, () => new Array(magnetData.z_grid.length).fill(0));
 
     for (let name in currents) {
-        let I = currents[name];
-        if (I > 0) {
-            magnetData.coils1D[name].forEach((v, i) => bz1D[i] += v * I);
-            magnetData.coils2D[name].forEach((row, r) => { row.forEach((v, c) => bmag2D[r][c] += v * I); });
-        }
+        let I = currents[name]; if (I <= 0) continue;
+        magnetData.coils1D[name].forEach((v, i) => bz1D[i] += v * I);
+        magnetData.coils2D[name].forEach((row, r) => row.forEach((v, c) => bmag2D[r][c] += v * I));
     }
 
-    let errorSum = 0;
-    const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
-    zAxial.forEach((_, i) => errorSum += Math.abs(currentTarget[i] - bz1D[i]));
-    let match = Math.max(0, 100 * (1 - ((errorSum / zAxial.length) / peak * 3.3)));
+    let err = 0; const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
+    z.forEach((_, i) => err += Math.abs(currentTarget[i] - bz1D[i]));
+    let match = Math.max(0, 100 * (1 - ((err / z.length) / peak * 3.3)));
     
-    const scoreElem = document.getElementById('scoreLabel');
-    scoreElem.innerText = `MATCH: ${match.toFixed(1)}%`;
-    scoreElem.style.color = match >= 90 ? "#2ecc40" : "#000";
+    document.getElementById('scoreLabel').innerText = `STABILITY: ${match.toFixed(1)}%`;
+    document.getElementById('scoreLabel').style.color = match >= 90 ? "#00ff41" : "#ff3131";
 
-    Plotly.react('plot1D', [
-        { x: zAxial, y: currentTarget, name: 'Goal', line: {color:'#888', width: 6} },
-        { x: zAxial, y: bz1D, name: 'Live', line: {color:'#0074d9', width: 2.5} }
-    ], { title: 'Axial Profile (Bz)', margin: {t:40, b:40, l:50, r:20} });
+    Plotly.react('plot1D', [{ x: z, y: currentTarget, name: 'Goal', line: {color:'#222', width:6} }, { x: z, y: bz1D, name: 'Live', line: {color:'#00ff41', width:2} }], 
+        { paper_bgcolor: '#000', plot_bgcolor: '#000', font: {color: '#00ff41'}, margin: {t:30,b:30,l:40,r:10}, xaxis: {gridcolor: '#111'}, yaxis: {gridcolor: '#111'} });
+    Plotly.react('plot2D', [{ z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, type: 'heatmap', colorscale: 'Greens' }], 
+        { paper_bgcolor: '#000', plot_bgcolor: '#000', font: {color: '#00ff41'}, margin: {t:30,b:30,l:40,r:10} });
+}
 
-    
-    Plotly.react('plot2D', [{
-        z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, type: 'heatmap', colorscale: 'Turbo', zsmooth: 'best'
-    }], { title: '2D Field Intensity', margin: {t:40, b:40, l:50, r:20} });
+function saveScore(name, score) {
+    let scores = JSON.parse(localStorage.getItem('aegisScores') || '[]');
+    scores.push({ name, score: parseFloat(score) });
+    scores.sort((a, b) => b.score - a.score);
+    localStorage.setItem('aegisScores', JSON.stringify(scores.slice(0, 10)));
+    displayLeaderboard();
+}
+
+function displayLeaderboard() {
+    const scores = JSON.parse(localStorage.getItem('aegisScores') || '[]');
+    document.getElementById('leaderboard-body').innerHTML = scores.map((s, i) => `<tr><td>${i+1}</td><td>${s.name}</td><td>${s.score.toFixed(1)}%</td></tr>`).join('');
 }
 
 function beginMission() {
-    timeLeft = 60;
-    document.getElementById('startBtn').disabled = true;
+    if (bgHum) bgHum.stop(); playDigitalSound('hum');
+    timeLeft = 60; document.getElementById('startBtn').disabled = true;
     for (let n in currents) currents[n] = 0;
     document.querySelectorAll('input[type=range]').forEach(i => i.value = 0);
-    document.querySelectorAll('[id^="label_"]').forEach(s => s.innerText = "0.0 A");
     update();
 
     timerId = setInterval(() => {
         timeLeft--;
         document.getElementById('timerLabel').innerText = timeLeft + "s";
+        
+        if (timeLeft === 10) {
+            playDigitalSound('alarm');
+            document.getElementById('timerLabel').style.fontSize = "50px";
+            document.body.classList.add('glitch-active'); // TRIGGER THE GLITCH
+        }
+
         if (timeLeft <= 0) {
-            clearInterval(timerId);
-            timerId = null;
-            let finalMatch = parseFloat(document.getElementById('scoreLabel').innerText.replace('MATCH: ', ''));
-            if (finalMatch >= 90) alert("🎊 SUCCESS! Antimatter Stable.");
-            else alert("💥 BOOM! Better luck next time.");
-            if (confirm("Restart Mission?")) beginMission();
-            else document.getElementById('startBtn').disabled = false;
+            clearInterval(timerId); timerId = null;
+            if (bgHum) bgHum.stop(); document.body.classList.remove('glitch-active');
+            let finalMatch = parseFloat(document.getElementById('scoreLabel').innerText.replace('STABILITY: ', ''));
+            if (finalMatch >= 90) {
+                let name = prompt(`&gt; SUCCESS! STABILITY: ${finalMatch.toFixed(1)}%\nLOG NAME:`, "RE_SEARCHER");
+                if (name) saveScore(name, finalMatch);
+            } else { alert("💥 CONTAINMENT_FAILURE: LAB_LOST."); }
+            document.getElementById('startBtn').disabled = false;
         }
     }, 1000);
 }
