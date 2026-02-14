@@ -69,7 +69,7 @@
             </div>
             <div class="score" id="scoreLabel">STABILITY: 0.0%</div>
             <div style="font-size:10px; color:#666; text-align:center;">
-                VOL <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.15" oninput="updateMusicVol(this.value)" style="width:60px; vertical-align:middle;" disabled>
+                VOL <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.04" oninput="updateMusicVol(this.value)" style="width:60px; vertical-align:middle;" disabled>
                 <div id="activeUser" style="color:var(--accent); margin-top:4px;">OP: UNKNOWN</div>
             </div>
             <div class="timer" id="timerLabel">100s</div>
@@ -192,9 +192,9 @@ function beginMission() {
 
     if (!magnetHum) {
         magnetHum = audioCtx.createOscillator(); humGain = audioCtx.createGain();
-        magnetHum.type = 'sawtooth'; magnetHum.frequency.setValueAtTime(55, audioCtx.currentTime);
+        magnetHum.type = 'sawtooth'; magnetHum.frequency.setValueAtTime(30, audioCtx.currentTime);
         humGain.gain.setValueAtTime(0, audioCtx.currentTime);
-        humGain.gain.exponentialRampToValueAtTime(0.04, audioCtx.currentTime + 1);
+        humGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
         magnetHum.connect(humGain); humGain.connect(audioCtx.destination); magnetHum.start();
     }
     
