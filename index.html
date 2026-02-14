@@ -2,362 +2,260 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>🧲 CERN AEgIS: TRAP_MAINFRAME_v4.0</title>
+    <title>🧲 CERN AEgIS: TRAP_MAINFRAME_v7.0.0</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        :root { --bg: #0b0e14; --accent: #00ff41; --panel: #161b22; --text: #00ff41; }
-        body { font-family: 'Courier New', monospace; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
-        @keyframes shake { 0%{transform:translate(0)} 25%{transform:translate(-3px,3px)} 50%{transform:translate(3px,-3px)} 100%{transform:translate(0)} }
-        .glitch-active { animation: shake 0.1s infinite; border: 2px solid #ff3131 !important; }
+        :root { --bg: #0b0e14; --accent: #00ff41; --panel: #161b22; --text: #00ff41; --danger: #ff3131; }
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100vh; font-family: 'Courier New', monospace; background: #000; color: var(--text); overflow: hidden; }
 
-        .hud { display: grid; grid-template-columns: 1fr 1.5fr 1fr; background: #000; padding: 15px 30px; border-bottom: 2px solid var(--accent); align-items: center; z-index: 100; }
-        #startBtn { padding: 12px 24px; font-weight: bold; background: var(--accent); color: #000; border: none; cursor: pointer; text-transform: uppercase; }
-        #startBtn:disabled { background: #333; color: #666; cursor: not-allowed; }
-        .score { font-size: 32px; font-weight: bold; text-align: center; text-shadow: 0 0 10px var(--accent); }
-        .timer { font-size: 32px; color: #ff3131; font-weight: bold; text-align: right; }
+        /* --- SCREENS --- */
+        #bootScreen, #briefingScreen { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2500; }
+        #briefingScreen { display: none; padding: 40px; }
+        #gameInterface { display: none; height: 100vh; width: 100vw; flex-direction: column; }
 
-        .main-content { display: grid; grid-template-columns: 1fr 350px 300px; flex: 1; overflow: hidden; gap: 10px; padding: 10px; background: #000; }
-        .plots { display: grid; grid-template-rows: 1.2fr 1fr; gap: 10px; overflow: hidden; }
+        /* --- BOOT INPUT --- */
+        .boot-input { background: #000; border: 1px solid var(--accent); color: var(--accent); padding: 10px; width: 250px; text-align: center; margin-bottom: 20px; outline: none; text-transform: uppercase; }
         
-        .plot-container { position: relative; width: 100%; height: 100%; }
-        #plot2D { width: 100%; height: 100%; z-index: 1; }
+        /* --- HUD --- */
+        .hud { display: grid; grid-template-columns: 180px 1fr 1fr 180px; background: #000; padding: 0 20px; border-bottom: 2px solid #333; align-items: center; height: 55px; flex-shrink: 0; }
+        #startBtn { padding: 8px 16px; background: #111; color: var(--accent); border: 2px solid var(--accent); cursor: pointer; text-transform: uppercase; font-size: 11px; font-weight: bold; }
+        #startBtn:disabled { color: #444; border-color: #222; cursor: not-allowed; }
+        .score { font-size: 22px; font-weight: bold; text-align: center; color: #fff; text-shadow: 0 0 10px var(--accent); }
+        .timer { font-size: 24px; color: var(--danger); font-weight: bold; text-align: right; }
+        
+        /* Global High Score Banner */
+        .high-score-banner { font-size: 10px; color: #fff; background: rgba(0,255,65,0.1); padding: 2px 10px; border: 1px solid #333; border-radius: 10px; }
+
+        /* --- LAYOUT --- */
+        .main-content { display: flex; flex-grow: 1; gap: 8px; padding: 8px; background: #080a0f; min-height: 0; overflow: hidden; }
+        .plots { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+        .plot-wrapper { flex: 1; min-height: 0; background: #000; border: 1px solid #333; position: relative; border-radius: 4px; overflow: hidden; }
         #particleCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
 
-        .card { background: var(--panel); border: 1px solid var(--accent); border-radius: 4px; padding: 15px; overflow-y: auto; }
-        .controls h3, .leaderboard h3 { margin: 0 0 10px 0; border-bottom: 1px solid var(--accent); padding-bottom: 8px; font-size: 16px; text-transform: uppercase; }
-        .coil-item { margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .coil-info { display: flex; justify-content: space-between; font-size: 12px; }
-        input[type=range] { width: 100%; cursor: pointer; filter: hue-rotate(90deg); }
+        .card { width: 420px; background: var(--panel); border: 1px solid #30363d; padding: 12px; display: flex; flex-direction: column; min-height: 0; }
+        #coil-list { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 6px; }
+        .coil-item { padding: 6px; background: #0d1117; border: 1px solid #222; border-radius: 3px; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: #222; height: 4px; outline: none; }
+        input[type=range]:disabled { opacity: 0.2; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 10px; background: var(--accent); cursor: pointer; }
 
-        #leaderboard-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        #leaderboard-table td { padding: 8px 5px; border-bottom: 1px solid #333; }
-
-        #introModal, #reportModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-body { background: #000; border: 2px solid var(--accent); padding: 40px; text-align: center; max-width: 650px; width: 90%; box-shadow: 0 0 20px var(--accent); }
-        .ready-btn { margin-top: 20px; padding: 15px 40px; background: var(--accent); color: #000; border: none; cursor: pointer; font-weight: bold; }
-        .funny-msg { color: #888; font-style: italic; font-size: 14px; margin-bottom: 20px; min-height: 40px; }
+        .shake-crisis { animation: shake 0.05s infinite; border: 10px solid var(--danger) !important; }
+        @keyframes shake { 0%{transform:translate(0,0)} 25%{transform:translate(-5px,5px)} 50%{transform:translate(5px,-5px)} 100%{transform:translate(0,0)} }
+        .terminal-log { width: 100%; max-width: 600px; height: 300px; border: 1px solid var(--accent); padding: 20px; font-size: 12px; line-height: 1.5; }
+        .ready-btn { padding: 12px 30px; background: #000; color: var(--accent); border: 2px solid var(--accent); cursor: pointer; font-weight: bold; text-transform: uppercase; }
     </style>
 </head>
-<body>
+<body id="mainBody">
 
-    <div id="introModal">
-        <div class="modal-body">
-            <h2>&gt; SYSTEM_BOOT_SEQUENCE</h2>
-            <p id="bootQuip" class="funny-msg"></p>
-            <p>1D Axial Confinement Protocol Enabled.</p>
-            <p><strong>GOAL:</strong> Maintain stability at <strong>90%+</strong>. Failure results in a very polite but firm letter from CERN HR.</p>
-            <button class="ready-btn" onclick="initAudio(); document.getElementById('introModal').style.display='none'">ENGAGE MAGNETS (CAREFULLY)</button>
-        </div>
+    <div id="bootScreen">
+        <h1 style="color:var(--accent); font-size: 20px; margin-bottom: 30px;">&gt; AEgIS_MAINFRAME_AUTH</h1>
+        <input type="text" id="operatorInput" class="boot-input" placeholder="ENTER OPERATOR ID" maxlength="12">
+        <button class="ready-btn" onclick="masterUnlock()">ENGAGE MAGNETS</button>
     </div>
 
-    <div id="reportModal" style="display:none;">
-        <div class="modal-body">
-            <h2>&gt; MISSION_DEBRIEF</h2>
-            <p id="reportMsg" style="font-size: 18px; line-height: 1.5; margin: 20px 0;"></p>
-            <div id="reportGraph" style="height:250px;"></div>
-            <button class="ready-btn" onclick="location.reload()">RE-INITIALIZE HARDWARE</button>
-        </div>
+    <div id="briefingScreen">
+        <div class="terminal-log" id="logContainer"></div>
+        <button id="accessBtn" class="ready-btn" style="margin-top:20px; display:none;" onclick="enterLab()">INITIALIZE TERMINAL</button>
     </div>
 
-    <div class="hud">
-        <button onclick="beginMission()" id="startBtn">INITIALIZE</button>
-        <div class="score" id="scoreLabel">STABILITY: 0.0%</div>
-        <div class="timer" id="timerLabel">60s</div>
-    </div>
-
-    <div class="main-content">
-        <div class="plots">
-            <div class="plot-container card">
-                <div id="plot2D"></div>
-                <canvas id="particleCanvas"></canvas>
+    <div id="gameInterface">
+        <audio id="bgMusic" loop><source src="track1.mp3" type="audio/mpeg"></audio>
+        <div class="hud">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <button onclick="beginMission()" id="startBtn">INITIALIZE</button>
+                <div id="topScoreDisplay" class="high-score-banner">TOP OP: --- | 0.0%</div>
             </div>
-            <div id="plot1D" class="card"></div>
+            <div class="score" id="scoreLabel">STABILITY: 0.0%</div>
+            <div style="font-size:10px; color:#666; text-align:center;">
+                VOL <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.15" oninput="updateMusicVol(this.value)" style="width:60px; vertical-align:middle;" disabled>
+                <div id="activeUser" style="color:var(--accent); margin-top:4px;">OP: UNKNOWN</div>
+            </div>
+            <div class="timer" id="timerLabel">100s</div>
         </div>
-        <div class="card controls">
-            <h3>&gt; COIL_ARRAYS</h3>
-            <select id="missionSelect" onchange="toggleMission()" style="background:#000; color:var(--accent); border:1px solid var(--accent); width:100%; padding:8px; margin-bottom:15px;">
-                <option value="aegis">AEgIS_STABILIZATION</option>
-                <option value="random">GHOST_MODE (CLICK PLOT)</option>
-            </select>
-            <div id="coil-list"></div>
-        </div>
-        <div class="card leaderboard">
-            <h3>&gt; TOP_LEVEL_GEEKS</h3>
-            <table id="leaderboard-table"><tbody id="leaderboard-body"></tbody></table>
+
+        <div class="main-content">
+            <div class="plots">
+                <div class="plot-wrapper">
+                    <div id="plot2D" style="height:100%; width:100%;"></div>
+                    <canvas id="particleCanvas"></canvas>
+                </div>
+                <div class="plot-wrapper"><div id="plot1D" style="height:100%; width:100%;"></div></div>
+            </div>
+            <div class="card">
+                <select id="missionSelect" onchange="toggleMission()" style="background:#000; color:var(--accent); border:1px solid #333; width:100%; padding:4px; margin-bottom:10px; font-size:10px;" disabled>
+                    <option value="aegis">AEgIS_STABILIZATION</option>
+                    <option value="random">GHOST_MODE (CLICK PLOT)</option>
+                </select>
+                <div id="coil-list"></div>
+            </div>
         </div>
     </div>
 
 <script>
-let magnetData = null; let currents = {}; let timeLeft = 0; let timerId = null;
-let currentTarget = []; let isRandom = false; let curMatch = 0; let stabilityHistory = [];
-let zk = 'z'; let ck = 'coils';
+let magnetData = null, currents = {}, timeLeft = 0, timerId = null, curMatch = 0, isSystemActive = false;
+let audioCtx = null, magnetHum = null, humGain = null, particles = [], operatorName = "OPERATOR";
+let currentTarget = [], isRandom = false;
 
-// --- AUDIO SYSTEM ---
-let audioCtx = null;
-let bgHum = null; 
-let alarmOsc = null;
+function masterUnlock() {
+    const input = document.getElementById('operatorInput').value;
+    operatorName = input.trim() !== "" ? input.toUpperCase() : "OPERATOR";
+    document.getElementById('activeUser').innerText = "OP: " + operatorName;
+    
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    document.getElementById('bootScreen').style.display = 'none';
+    document.getElementById('briefingScreen').style.display = 'flex';
+    updateTopScoreDisplay();
 
-const quips = [
-    "Loading budget-grade magnets... Calibrating coffee levels... Warning: Antihydrogen doesn't like your face.",
-    "Simulating 'Scientific Breakthrough'... Error: Result is just another PhD thesis. Deleting files to save space.",
-    "Cryogenic cooling initiated. Please remove your fingers from the liquid nitrogen—unless you were planning on being a statue today.",
-    "Scanning for competent operator... Searching... Searching... Warning: Results inconclusive. Proceeding with low expectations.",
-    "Antimatter annihilation imminent. If you see a bright light, please refrain from screaming; it’s bad for the data sensors.",
-    "Adjusting magnetic field to 'Maximum Overdrive.' If the building starts vibrating, that’s just the laws of physics asking for a raise.",
-    "Vacuum seal integrity at 99%. The remaining 1% is just hope and duct tape. Good luck.",
-    "Bypassing safety protocols... Why? Because clicking 'Yes' to all those warnings was taking too long.",
-    "Recalibrating particle sensors. Currently detecting 40% positrons and 60% sheer panic.",
-    "Quantum tunnel initialized. Please don't think about cats. Especially dead/alive ones. It makes the math messy."
-];
-
-function setRandomQuip() {
-    document.getElementById('bootQuip').innerText = `"${quips[Math.floor(Math.random() * quips.length)]}"`;
-}
-
-function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-}
-
-function playSound(type) {
-    if (!audioCtx) return;
-    initAudio();
-
-    if (type === 'hum') {
-        if (bgHum) return; 
-        bgHum = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        bgHum.type = 'sawtooth'; 
-        bgHum.frequency.setValueAtTime(55, audioCtx.currentTime); 
-        g.gain.setValueAtTime(0.02, audioCtx.currentTime); 
-        bgHum.connect(g); 
-        g.connect(audioCtx.destination);
-        bgHum.start();
-    } else if (type === 'click') {
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
-        g.gain.setValueAtTime(0.05, audioCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05);
-        osc.connect(g);
-        g.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.05);
-    } else if (type === 'alarm' && !alarmOsc) {
-        alarmOsc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        alarmOsc.type = 'square';
-        alarmOsc.connect(g); 
-        g.connect(audioCtx.destination);
-        alarmOsc.start();
-        alarmOsc.loopInt = setInterval(() => {
-            if (timeLeft <= 0 || curMatch >= 95) {
-                if (alarmOsc) { try { alarmOsc.stop(); } catch(e) {} alarmOsc = null; }
-                clearInterval(alarmOsc.loopInt);
-                return;
-            }
-            alarmOsc.frequency.setValueAtTime(Math.random() > 0.5 ? 900 : 600, audioCtx.currentTime);
-            g.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        }, 150);
-    }
-}
-
-function stopSounds() {
-    if (bgHum) { try { bgHum.stop(); } catch(e) {} bgHum = null; }
-    if (alarmOsc) { try { alarmOsc.stop(); } catch(e) {} alarmOsc = null; }
-}
-
-// --- PARTICLE PHYSICS ENGINE ---
-const canvas = document.getElementById('particleCanvas');
-const ctx = canvas.getContext('2d');
-let particles = [];
-
-function initParticles() {
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    particles = [];
-    let cy = canvas.height / 2;
-    let yMm = magnetData ? (Math.max(...magnetData.y_grid) - Math.min(...magnetData.y_grid)) : 20;
-    let threeMmPx = (3 * canvas.height) / yMm;
-
-    for (let i = 0; i < 75; i++) {
-        particles.push({
-            x: Math.random() * canvas.width,
-            y: cy + (Math.random() - 0.5) * threeMmPx,
-            vx: (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2),
-            vy: 0 
-        });
-    }
-}
-
-function animateParticles() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!magnetData) return requestAnimationFrame(animateParticles);
-    let cy = canvas.height / 2;
-    let boundary = canvas.width * 0.12;
-    particles.forEach(p => {
-        if (curMatch >= 90) {
-            if (p.x > canvas.width - boundary || p.x < boundary) p.vx *= -1;
-            p.vy = (cy - p.y) * 0.2;
-            ctx.fillStyle = "#00ff41";
-        } else {
-            p.vy += (Math.random() - 0.5) * (1.5 - curMatch/50);
-            if (p.x > canvas.width) p.x = 0; if (p.x < 0) p.x = canvas.width;
-            ctx.fillStyle = "#ff3131";
-        }
-        p.x += p.vx; p.y += p.vy;
-        if (p.y > canvas.height || p.y < 0) p.y = cy;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill();
+    const log = document.getElementById('logContainer');
+    const msgs = ["Verifying Credentials...", `Welcome, ${operatorName}.`, "Handshaking with AD Hall...", "Cryo levels: 4.2K (OK)", "Awaiting Manual Initialization..."];
+    msgs.forEach((m, i) => {
+        setTimeout(() => {
+            let d = document.createElement('div'); d.innerText=`> ${m}`; log.appendChild(d);
+            if(i===msgs.length-1) document.getElementById('accessBtn').style.display='block';
+        }, i*400);
     });
-    requestAnimationFrame(animateParticles);
 }
 
-// --- INITIALIZATION ---
-setRandomQuip();
+function updateTopScoreDisplay() {
+    let top = JSON.parse(localStorage.getItem('aegisTop') || '{"name":"NONE","score":0}');
+    document.getElementById('topScoreDisplay').innerText = `TOP OP: ${top.name} | ${top.score.toFixed(1)}%`;
+}
 
-fetch('magnet_data.json').then(res => res.json()).then(data => {
-    magnetData = data;
-    zk = data.z_axial ? 'z_axial' : 'z';
-    ck = data.coils1D ? 'coils1D' : 'coils';
-    currentTarget = [...data.target];
-    initUI(); 
-    update(); 
-    initParticles(); 
-    animateParticles(); 
-    displayLeaderboard();
-
-    // GHOST MODE CLICK LISTENER
-    const plot1D = document.getElementById('plot1D');
-    plot1D.on('plotly_click', function() {
-        if (!isRandom) return;
-        playSound('click');
-        let ghost = new Array(magnetData[zk].length).fill(0);
-        const keys = Object.keys(magnetData[ck]);
-        for(let j=0; j<4; j++) {
-            let k = keys[Math.floor(Math.random() * keys.length)];
-            let amp = Math.random() * 150;
-            magnetData[ck][k].forEach((v, i) => ghost[i] += v * amp);
-        }
-        currentTarget = ghost; 
-        update();
+function enterLab() {
+    document.getElementById('briefingScreen').style.display = 'none';
+    document.getElementById('gameInterface').style.display = 'flex';
+    document.getElementById('bgMusic').play();
+    fetch('magnet_data.json').then(r => r.json()).then(data => {
+        magnetData = data; 
+        currentTarget = [...data.target];
+        initUI(); initParticles(); update(); animate();
+        document.getElementById('plot1D').on('plotly_click', () => { if(isRandom && isSystemActive) generateGhostField(); });
     });
-});
+}
 
 function initUI() {
     const list = document.getElementById('coil-list');
-    list.innerHTML = "";
-    Object.keys(magnetData[ck]).sort().forEach(name => {
+    const ck = magnetData.coils1D ? 'coils1D' : 'coils';
+    Object.keys(magnetData[ck]).sort((a,b) => (parseInt(a.match(/\d+/))||0) - (parseInt(b.match(/\d+/))||0)).forEach(name => {
         currents[name] = 0;
-        let div = document.createElement('div');
-        div.className = 'coil-item';
-        div.innerHTML = `<div class="coil-info"><span>${name}</span><span id="label_${name}">0 A</span></div>
-                         <input type="range" min="0" max="200" step="0.1" value="0" oninput="setPower('${name}',this.value)">`;
+        let div = document.createElement('div'); div.className = 'coil-item';
+        div.innerHTML = `<div style="display:flex; justify-content:space-between; font-size:9px;"><span>COIL ${name.match(/\d+/)}</span><span id="label_${name}">0.0A</span></div>
+                         <input type="range" class="magnet-slider" id="slider_${name}" min="0" max="200" step="0.1" value="0" oninput="setPower('${name}',this.value)" disabled>`;
         list.appendChild(div);
     });
 }
 
-function setPower(name, val) {
-    currents[name] = parseFloat(val);
-    document.getElementById(`label_${name}`).innerText = val + " A";
-    playSound('click');
-    update();
-}
-
-function toggleMission() {
-    isRandom = (document.getElementById('missionSelect').value === 'random');
-    currentTarget = isRandom ? new Array(magnetData[zk].length).fill(0) : [...magnetData.target];
-    update();
+function setPower(name, val) { 
+    if(!isSystemActive) return;
+    currents[name] = parseFloat(val); 
+    document.getElementById(`label_${name}`).innerText = val + "A"; 
+    update(); 
 }
 
 function update() {
     if (!magnetData) return;
-    const z = magnetData[zk]; 
-    let bz1D = new Array(z.length).fill(0);
-    let bmag2D = magnetData.y_grid ? Array.from({length: magnetData.y_grid.length}, () => new Array(magnetData.z_grid.length).fill(0)) : null;
-    
-    let totalCurrent = 0;
+    const zk = magnetData.z_axial ? 'z_axial' : 'z';
+    let bz1D = new Array(magnetData[zk].length).fill(0);
+    let bmag2D = Array.from({length: magnetData.y_grid.length}, () => new Array(magnetData.z_grid.length).fill(0));
+    let allZero = Object.values(currents).every(v => v === 0);
+
     for (let name in currents) {
-        let I = currents[name]; 
-        totalCurrent += I;
-        if (I <= 0) continue;
-        magnetData[ck][name].forEach((v, i) => bz1D[i] += v * I);
-        if (bmag2D) magnetData.coils2D[name].forEach((row, r) => row.forEach((v, c) => bmag2D[r][c] += v * I));
+        let I = currents[name]; if (I <= 0) continue;
+        magnetData.coils1D[name].forEach((v, i) => bz1D[i] += v * I);
+        magnetData.coils2D[name].forEach((row, r) => row.forEach((v, c) => bmag2D[r][c] += v * I));
     }
 
-    if (totalCurrent < 0.1) {
-        curMatch = 0; // Harsher Logic: No power, no stability.
-    } else {
-        let err = 0; 
-        const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
-        z.forEach((_, i) => err += Math.abs(currentTarget[i] - bz1D[i]));
-        curMatch = Math.max(0, 100 * (1 - ((err / z.length) / peak * 3.3)));
+    if (allZero) { curMatch = 0; }
+    else {
+        let sumSqErr = 0; const peak = Math.max(...currentTarget.map(Math.abs)) || 1;
+        magnetData[zk].forEach((_, i) => {
+            let diff = currentTarget[i] - bz1D[i];
+            sumSqErr += diff * diff;
+        });
+        curMatch = Math.max(0, 100 * (1 - (Math.sqrt(sumSqErr / magnetData[zk].length) / (peak * 0.35))));
     }
-    
     document.getElementById('scoreLabel').innerText = `STABILITY: ${curMatch.toFixed(1)}%`;
-    Plotly.react('plot1D', [{ x: z, y: currentTarget, name: 'Goal', line: {color:'#444', width:6} }, { x: z, y: bz1D, name: 'Live', line: {color:'#00ff41', width:2} }], { paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#00ff41'}, margin:{t:30,b:30,l:40,r:10} });
-    if (bmag2D) Plotly.react('plot2D', [{ z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, type: 'heatmap', colorscale: 'Greens' }], { paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#00ff41'}, margin:{t:30,b:30,l:40,r:10} });
+
+    const common = { paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#00ff41', size:9}, margin:{t:35,b:40,l:55,r:60} };
+    Plotly.react('plot1D', [{ x: magnetData[zk], y: currentTarget, line:{dash:'dot', color:'#333', width:2}}, { x: magnetData[zk], y: bz1D, line:{color:curMatch>95?'#00ff41':'#ff3131'}}], { ...common, xaxis:{title:'Axial Z (mm)', gridcolor:'#111'}, yaxis:{title:'B (T)', gridcolor:'#111'} });
+    Plotly.react('plot2D', [{ z: bmag2D, x: magnetData.z_grid, y: magnetData.y_grid, type: 'heatmap', colorscale: curMatch > 90 ? 'Viridis' : 'Hot', showscale: true, colorbar: {title: 'B (T)', tickfont: {color:'#00ff41'}} }], { ...common, xaxis:{title:'Z-Axis', gridcolor:'#111'}, yaxis:{title:'Radial R', gridcolor:'#111'} });
 }
 
 function beginMission() {
-    initAudio();
-    playSound('hum');
-    timeLeft = 60; stabilityHistory = []; document.getElementById('startBtn').disabled = true;
+    isSystemActive = true;
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('missionSelect').disabled = false;
+    document.getElementById('volSlider').disabled = false;
+    document.querySelectorAll('.magnet-slider').forEach(s => s.disabled = false);
+
+    if (!magnetHum) {
+        magnetHum = audioCtx.createOscillator(); humGain = audioCtx.createGain();
+        magnetHum.type = 'sawtooth'; magnetHum.frequency.setValueAtTime(55, audioCtx.currentTime);
+        humGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        humGain.gain.exponentialRampToValueAtTime(0.04, audioCtx.currentTime + 1);
+        magnetHum.connect(humGain); humGain.connect(audioCtx.destination); magnetHum.start();
+    }
+    
+    timeLeft = 100;
     timerId = setInterval(() => {
-        timeLeft--; stabilityHistory.push(curMatch);
+        timeLeft--;
         document.getElementById('timerLabel').innerText = timeLeft + "s";
-        if (timeLeft <= 10 && curMatch < 95) { 
-            document.body.classList.add('glitch-active'); 
-            playSound('alarm'); 
-        }
+        if (timeLeft <= 10 && curMatch < 30) document.body.classList.add('shake-crisis');
+        else document.body.classList.remove('shake-crisis');
+        
         if (timeLeft <= 0) {
-            clearInterval(timerId); 
-            stopSounds(); 
-            document.body.classList.remove('glitch-active');
-            showReport();
-            if (curMatch >= 90) {
-                let n = prompt(`> SUCCESS. LOG SCIENTIST NAME:`, "RE_SEARCHER");
-                if (n) {
-                    let sc = JSON.parse(localStorage.getItem('aegisScores') || '[]');
-                    sc.push({ name: n, score: curMatch }); sc.sort((a,b) => b.score - a.score);
-                    localStorage.setItem('aegisScores', JSON.stringify(sc.slice(0,10))); displayLeaderboard();
-                }
-            }
+            clearInterval(timerId);
+            document.body.classList.remove('shake-crisis');
+            isSystemActive = false;
+            document.querySelectorAll('.magnet-slider').forEach(s => s.disabled = true);
             document.getElementById('startBtn').disabled = false;
+            if (humGain) humGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
+            checkHighScore(curMatch);
+            alert("STABILITY LOGGED: " + curMatch.toFixed(1) + "%");
         }
     }, 1000);
 }
 
-function showReport() {
-    const reportModal = document.getElementById('reportModal');
-    const msgLabel = document.getElementById('reportMsg');
-    reportModal.style.display = 'flex';
-    
-    let result = "";
-    if (curMatch < 30) {
-        result = "FAILURE: You are a useless scientist. Please return your lab coat and exit via the gift shop.";
-    } else if (curMatch < 70) {
-        result = "MEDIOCRE: Not a total disaster, but the positrons are bored. Try harder.";
-    } else if (curMatch < 90) {
-        result = "STABLE-ISH: You're getting there. Still wouldn't trust you with the Large Hadron Collider though.";
-    } else {
-        result = "LEGENDARY: Trap secured! You've officially earned your 'Physics Wizard' badge.";
+function checkHighScore(s) {
+    let top = JSON.parse(localStorage.getItem('aegisTop') || '{"name":"NONE","score":0}');
+    if (s > top.score) {
+        localStorage.setItem('aegisTop', JSON.stringify({"name": operatorName, "score": s}));
+        updateTopScoreDisplay();
     }
-    
-    msgLabel.innerText = result;
-    Plotly.newPlot('reportGraph', [{ x: stabilityHistory.map((_,i)=>i), y: stabilityHistory, fill:'tozeroy', line:{color:'#00ff41'} }], { paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#00ff41'}, margin:{t:10,b:30,l:40,r:10} });
 }
 
-function displayLeaderboard() {
-    const scores = JSON.parse(localStorage.getItem('aegisScores') || '[]');
-    document.getElementById('leaderboard-body').innerHTML = scores.map((s, i) => `<tr><td style="color:#00ff41; font-weight:bold">${i+1}</td><td>${s.name}</td><td>${s.score.toFixed(1)}%</td></tr>`).join('');
+function generateGhostField() {
+    if(!isSystemActive) return;
+    resetCoils();
+    let ghost = new Array(magnetData.z_axial.length).fill(0);
+    Object.keys(magnetData.coils1D).forEach(k => { if(Math.random() > 0.6) { let amp = Math.random() * 140; magnetData.coils1D[k].forEach((v,i) => ghost[i] += v * amp); } });
+    currentTarget = ghost; update();
 }
-window.addEventListener('resize', initParticles);
+
+function resetCoils() { for (let name in currents) { currents[name] = 0; if(document.getElementById(`slider_${name}`)) document.getElementById(`slider_${name}`).value = 0; if(document.getElementById(`label_${name}`)) document.getElementById(`label_${name}`).innerText = "0.0A"; } }
+
+function toggleMission() { if(!isSystemActive) return; isRandom = (document.getElementById('missionSelect').value === 'random'); resetCoils(); if (isRandom) generateGhostField(); else currentTarget = [...magnetData.target]; update(); }
+
+function initParticles() { const pc = document.getElementById('particleCanvas'); pc.width = pc.offsetWidth; pc.height = pc.offsetHeight; particles = Array.from({length: 60}, () => ({ x: Math.random() * pc.width, y: pc.height/2, vx: (Math.random()-0.5)*3, vy: 0 })); }
+
+function animate() {
+    const pc = document.getElementById('particleCanvas'); if(!pc) return;
+    const pCtx = pc.getContext('2d');
+    pCtx.clearRect(0,0,pc.width,pc.height);
+    particles.forEach(p => {
+        p.x += p.vx;
+        if(curMatch > 95) p.y += (pc.height/2 - p.y) * 0.15;
+        else p.y += (Math.random()-0.5) * 6;
+        if(p.x > pc.width) p.x = 0; if(p.x < 0) p.x = pc.width;
+        pCtx.fillStyle = curMatch > 95 ? "#00ff41" : "#ff3131";
+        pCtx.beginPath(); pCtx.arc(p.x, p.y, 2, 0, Math.PI*2); pCtx.fill();
+    });
+    requestAnimationFrame(animate);
+}
+
+function updateMusicVol(v) { document.getElementById('bgMusic').volume = v; }
 </script>
 </body>
 </html>
